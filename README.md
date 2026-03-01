@@ -102,12 +102,6 @@ blastx \
 
 Exclude all LTR_Finder output sequences with similarity to coding domains.
 
-Filtering can be performed using:
-
-```bash
-
-```
-
 *Flexidot analysis*
 
 Run Flexidot on BLAST-filtered LTR_Finder output.
