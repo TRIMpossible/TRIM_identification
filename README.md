@@ -70,7 +70,9 @@ ltr_finder \
 LTR_Finder output can be extracted as nucleotide sequences using:
 
 ```bash
-helper_scripts/extract_LTR_Finder_fasta.py
+helper_scripts/extract_LTR_Finder_fasta.py  \
+  --ltr LTR_Finder_out.txt \ --genome genome_assembly.fasta \
+  --output LTR_Finder_output.fasta
 ```
 
 ### LTR_Finder output filtering 
