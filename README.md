@@ -149,7 +149,7 @@ These scripts perform:
 - Extraction of FASTA sequences from GFF coordinates
 - Optional extraction with flanking regions
 - Structural splitting of sequences
-- Self-BLAST validation of candidate TRIM elements
+- Selfblast validation of candidate TRIM elements
 
 ### Run workflow
 
@@ -163,7 +163,7 @@ python quantification_output_processing.py \
  --run-selfblast \ --selfblast-input split \ --selfblast-combined-gff
 ```
 
-This will execute: BLAST output → GFF → merged GFF → FASTA → self-BLAST
+This will execute: BLAST output → GFF → merged GFF → FASTA → selfblast validation
 
 ### Detailed Annotation
 
@@ -206,7 +206,7 @@ conda install -c bioconda mcl
 This script will elongate full length sequences with flanking regions and performs MAFFT alignments in order to filter duplicated hits: 
 
 ```bash
-python scanning_cluster_for_duplicates.py
+python scanning_cluster_for_duplicates.py -i path_to_input_fasta -o path_to_output_dir
 ```
 
 *Annotation of target site duplications (TSD)*
