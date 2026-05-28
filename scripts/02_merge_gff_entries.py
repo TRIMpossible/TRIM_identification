@@ -13,13 +13,6 @@ Assumptions
 - Coordinates are treated as 1-based inclusive (standard GFF). We only
   compare distances between features, so indexing convention does not
   affect merging behavior.
-
-Output
-------
-- Adds/updates:
-  - middle_pos=<int> of the merged span
-  - cut_pos1..cut_pos3 if merged span length >= --split-threshold
-    (positions at quarter points, excluding middle_pos)
 """
 
 from __future__ import annotations
@@ -29,6 +22,9 @@ import os
 from collections import defaultdict
 from pathlib import Path
 from typing import DefaultDict, List, Optional, Tuple
+
+Feature = Tuple[int, int, str, str, str, str]
+# start, end, feature_type, strand, attributes, feature_id
 
 def extract_identity(attributes: str) -> Optional[float]:
     for attribute in attributes.split(";"):
@@ -50,6 +46,7 @@ def update_id_and_middle(attributes: str, new_id: str, middle_pos: Optional[int]
     out = []
     seen_id = False
     seen_middle = False
+  
     for part in parts:
         if part.startswith("ID="):
             out.append(f"ID={new_id}")
@@ -76,8 +73,6 @@ def calculate_cut_positions(start: int, end: int, split_threshold: int) -> List[
         return [start + length // 4 * i for i in range(1, 4)]
     return []
 
-Feature = Tuple[int, int, str, str, str, str]  # start, end, type, strand, attributes, id
-
 def merge_gff_entries(
     gff_file: Path,
     output_file: Path,
@@ -86,8 +81,8 @@ def merge_gff_entries(
     split_threshold: int,
     log_dir: Path,
 ) -> None:
-    entries: DefaultDict[str, List[Feature]] = defaultdict(list)
-    merged_features_dict: DefaultDict[str, List[Tuple[int,int,str,str,str,List[str]]]] = defaultdict(list)
+    entries: DefaultDict[Tuple[str, str], List[Feature]] = defaultdict(list)
+    merged_features_dict: DefaultDict[Tuple[str, str], List[Tuple[int, int, str, str, str, List[str]]]] = defaultdict(list)
 
     # Read features
     with gff_file.open("r", encoding="utf-8") as f:
@@ -103,20 +98,24 @@ def merge_gff_entries(
             except ValueError:
                 continue
 
+            if end_i < start_i:
+                start_i, end_i = end_i, start_i
+          
             identity = extract_identity(attributes)
             feature_id = extract_id(attributes) or "unknown"
 
             if identity is None or identity < identity_threshold:
                 continue
 
-            entries[seq_id].append((start_i, end_i, feature_type, strand, attributes, feature_id))
+            entries[seq_id, strand].append((start_i, end_i, feature_type, strand, attributes, feature_id))
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
 
     with output_file.open("w", encoding="utf-8") as out:
         out.write("##gff-version 3\n")
-        for seq_id, features in entries.items():
+        
+        for (seq_id, strand_key), features in sorted(entries.items()):
             if not features:
                 continue
             features.sort(key=lambda x: x[0])
@@ -125,36 +124,40 @@ def merge_gff_entries(
             largest_hit_size = current_end - current_start
             merged_ids: List[str] = [current_id]
 
-            def flush_group():
+            def flush_group() -> None:
                 merged_middle_pos = current_start + (current_end - current_start) // 2
                 updated_attributes = update_id_and_middle(largest_hit_attributes, current_id, merged_middle_pos)
 
                 cut_positions = calculate_cut_positions(current_start, current_end, split_threshold)
                 cut_positions = [pos for pos in cut_positions if pos != merged_middle_pos]
+              
                 if cut_positions:
                     cut_pos_str = ";".join(f"cut_pos{i}={pos}" for i, pos in enumerate(cut_positions, start=1))
-                    updated_attributes = updated_attributes + (";" if updated_attributes else "") + cut_pos_str
+                    updated_attributes = updated_attributes + ";" + cut_pos_str
 
-                out.write(f"{seq_id}\t.\t{current_type}\t{current_start}\t{current_end}\t.\t{current_strand}\t.\t{updated_attributes}\n")
-                merged_features_dict[seq_id].append((current_start, current_end, current_type, current_strand, updated_attributes, merged_ids.copy()))
+                out.write(f"{seq_id}\t.\t{current_type}\t{current_start}\t{current_end}\t.\t"
+                          f"{current_strand}\t.\t{updated_attributes}\n"
+                merged_features_dict[(seq_id, current_strand)].append((current_start, current_end, current_type, current_strand, updated_attributes, merged_ids.copy()))
 
             for start, end, feature_type, strand, attributes, feature_id in features[1:]:
                 current_hit_size = end - start
+
+                same_strand = strand ==current_strand
+                close_enough = start -current_end <= merge_distance
+              
                 if current_hit_size > largest_hit_size:
                     largest_hit_size = current_hit_size
                     largest_hit_attributes = attributes
-
-                if start - current_end <= merge_distance:
-                    current_end = max(current_end, end)
-                    merged_ids.append(feature_id)
-                else:
-                    flush_group()
-                    current_start, current_end = start, end
-                    current_type, current_strand = feature_type, strand
-                    largest_hit_attributes = attributes
                     current_id = feature_id
-                    largest_hit_size = current_hit_size
-                    merged_ids = [feature_id]
+
+             else:
+                flush_group()
+                current_start, current_end = start, end
+                current_type, current_strand = feature_type, strand
+                largest_hit_attributes = attributes
+                current_id = feature_id
+                largest_hit_size = current_hit_size
+                merged_ids = [feature_id]
 
             flush_group()
 
@@ -162,33 +165,32 @@ def merge_gff_entries(
     print(f"Merged: {gff_file.name} -> {output_file.name}")
 
 def write_log(
-    entries: DefaultDict[str, List[Feature]],
-    merged_features_dict: DefaultDict[str, List[Tuple[int,int,str,str,str,List[str]]]],
+    entries: DefaultDict[Tuple [str, str], List[Feature]],
+    merged_features_dict: DefaultDict[Tuple[str, str], List[Tuple[int,int,str,str,str,List[str]]]],
     filename: str,
     log_dir: Path,
     identity_threshold: float,
     merge_distance: int,
 ) -> None:
     log_file = log_dir / f"{Path(filename).stem}_log.txt"
+
     with log_file.open("w", encoding="utf-8") as log:
         log.write(f"Input file: {filename}\n")
         log.write(f"identity_threshold: {identity_threshold}\n")
         log.write(f"merge_distance: {merge_distance}\n\n")
+        log.write("Merging rule: same esequence ID, same strand, within merge distance\n\n")
 
-        for seq_id, features in entries.items():
-            original_count = len(features)
-            merged_features = merged_features_dict.get(seq_id, [])
+        for key in sorted(entries):
+            seq_id, strand = key
+            original_count = len(entrie[key])
+            merged_features = merged_features_dict.get(key, [])
             merged_count = len(merged_features)
             hits_merged = original_count - merged_count
 
-            log.write(f"{seq_id}\n")
-            log.write("Original Count\tMerged Count\tHits Merged\n")
-            log.write(f"{original_count}\t{merged_count}\t{hits_merged}\n")
-
-            log.write("Merged groups (original IDs):\n")
+            log.write(f"{seq_id} strand={strand}\n")
             for mf in merged_features:
                 merged_ids = mf[5]
-                merged_ids_str = ", ".join([m for m in merged_ids if m])
+                merged_ids_str = ", ".join([m for mf in merged_ids if m])
                 log.write(f"- {merged_ids_str}\n")
             log.write("\n")
 
