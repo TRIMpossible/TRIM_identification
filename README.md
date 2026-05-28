@@ -90,7 +90,7 @@ database of LTR-retrotransposon domains: [REXdb](http://repeatexplorer.org/?page
 ```bash
 makeblastdb \
  -in protein_domain_database.fasta \ -parse_seqids \
- -dbtype nucl \ -out database_name
+ -dbtype prot \ -out database_name
 
 blastx \
  -query LTR_Finder_output.fasta \
