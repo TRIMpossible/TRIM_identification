@@ -16,7 +16,13 @@ This repository provides a detailed workflow for the detection and annotation of
 
 The overall workflow consists of three major steps illustrated in the figure below.
 
-![TRIM identification workflow](https://github.com/TRIMpossible/TRIM_identification/blob/main/images/TRIM_identification_workflow.png)
+![TRIM identification workflow](https://github.com/TRIMpossible/TRIM_identification/blob/main/images/Fig1_TRIM_identification_workflow.png)
+
+---
+
+## How to cite
+
+Maiwald S, Maiwald F, Heitkam T. Hide and seek: de novo identification in sugar beet reveals impact of non-autonomous LTR retrotransposons. Mobile DNA. 2026;17:26. https://doi.org/10.1186/s13100-026-00416-w
 
 ---
 
