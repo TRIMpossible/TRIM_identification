@@ -1,0 +1,18 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: TRIM Identification
+message: >-
+  If you use this software, please cite the corresponding publication.
+type: software
+authors:
+  - given-names: Sophie
+    family-names: Maiwald
+    email: sophie.maiwald@bio1.rwth-aachen.de
+    affiliation: RWTH Aachen University
+    orcid: 'https://orcid.org/0000-0002-0716-648X'
+date-released: '2026-09-11'
+preferred-citation:
+  type: article
+  doi: 10.1186/s13100-026-00416-w
